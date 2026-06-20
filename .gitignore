@@ -1,0 +1,76 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# YOLOv8 Model weights
+*.pt
+models/
+
+# Database and logs
+logs/traffic_surveillance.db
+logs/*.db
+*.log
+stderr.log
+stdout.log
+
+# Uploaded and processed video files
+videos/uploads/*
+!videos/uploads/.gitkeep
+videos/outputs/*
+!videos/outputs/.gitkeep
+
+# Speed violation screenshots
+violations/*
+!violations/.gitkeep
+
+# CSV and text reports
+logs/reports/*
+!logs/reports/.gitkeep
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS-specific files
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+.DS_Store
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Unused temporary output directory
+outputs/

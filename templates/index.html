@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Vehicle Speed & Attribute Detection System</title>
+    
+    <!-- External CSS Libraries -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1><i class="fa-solid fa-tower-observation"></i> Smart Vehicle Surveillance</h1>
+                <p>Speed & Attribute Detection System</p>
+            </div>
+            <div class="system-status">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span>Ready for Analysis</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ================= STEP 1: UPLOAD & CALIBRATE ================= -->
+        <div id="step-upload" class="wizard-step">
+            <div class="panel-card center-panel">
+                <div class="wizard-header">
+                    <h2>Upload Traffic Video</h2>
+                    <p class="subtitle">Select or drag & drop a video file, configure perspective homography parameters if needed, and analyze the footage.</p>
+                </div>
+
+                <!-- Collapsible Advanced Calibration Accordion -->
+                <details class="calibration-accordion">
+                    <summary class="accordion-header">
+                        <span><i class="fa-solid fa-compass-drafting"></i> Advanced Perspective Calibration Settings</span>
+                        <i class="fa-solid fa-chevron-down accordion-arrow"></i>
+                    </summary>
+                    <div class="accordion-content">
+                        <div class="config-grid">
+                            <div class="form-group">
+                                <label for="upload-speed-limit">Speed Limit (km/h)</label>
+                                <input type="number" id="upload-speed-limit" value="60" min="10" max="200">
+                            </div>
+                            <div class="form-group">
+                                <label for="upload-road-width">Road Width (meters)</label>
+                                <input type="number" id="upload-road-width" step="0.5" value="10.0">
+                            </div>
+                            <div class="form-group">
+                                <label for="upload-road-length">Calibration Zone Length (meters)</label>
+                                <input type="number" id="upload-road-length" step="1" value="40.0">
+                            </div>
+                        </div>
+
+                        <div class="coords-header-title">Perspective Homography Source Coordinates (1280x720 quad)</div>
+                        <div class="coords-grid">
+                            <div class="form-group">
+                                <label>Pt 1 (Bottom-Left) X, Y</label>
+                                <div class="coord-inputs">
+                                    <input type="number" id="up-p1-x" value="130">
+                                    <input type="number" id="up-p1-y" value="720">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Pt 2 (Top-Left) X, Y</label>
+                                <div class="coord-inputs">
+                                    <input type="number" id="up-p2-x" value="450">
+                                    <input type="number" id="up-p2-y" value="200">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Pt 3 (Top-Right) X, Y</label>
+                                <div class="coord-inputs">
+                                    <input type="number" id="up-p3-x" value="830">
+                                    <input type="number" id="up-p3-y" value="200">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Pt 4 (Bottom-Right) X, Y</label>
+                                <div class="coord-inputs">
+                                    <input type="number" id="up-p4-x" value="1150">
+                                    <input type="number" id="up-p4-y" value="720">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Drag & Drop Uploader -->
+                <div id="upload-box" class="upload-box" onclick="triggerFileSelect()">
+                    <i class="fa-solid fa-cloud-arrow-up upload-box-icon"></i>
+                    <h3>Drag & Drop Traffic Video Here</h3>
+                    <p>Supported Formats: MP4, AVI, MOV</p>
+                    <span class="btn-secondary" style="margin-top: 0.5rem; pointer-events: none;">Browse Files</span>
+                    <input type="file" id="file-input" style="display: none;" accept=".mp4,.avi,.mov" onchange="handleFileSelected()">
+                </div>
+
+                <!-- Selected File Display -->
+                <div id="selected-file-info" class="selected-file-info" style="display: none;">
+                    <i class="fa-solid fa-file-video file-icon"></i>
+                    <div class="file-details">
+                        <span id="selected-filename" style="font-weight: 600;">traffic.mp4</span>
+                        <span id="selected-filesize" style="font-size: 0.8rem; color: var(--text-secondary);">0.0 MB</span>
+                    </div>
+                    <button class="btn-remove" onclick="removeSelectedFile(event)"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Analyze Button -->
+                <button id="analyze-btn" class="btn-primary btn-large" style="margin-top: 1.5rem; width: 100%; display: none;" onclick="startAnalysis()">
+                    <i class="fa-solid fa-circle-play"></i> Analyze Video
+                </button>
+            </div>
+            
+            <!-- Session history at bottom of upload screen -->
+            <div class="panel-card" style="margin-top: 1.5rem;" id="upload-history-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left"></i> Previous Video Session Runs</h2>
+                </div>
+                <div class="history-list-grid" id="upload-history-list">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; grid-column: 1 / -1;">No uploads logged in this session.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= STEP 2: PROCESSING STATE ================= -->
+        <div id="step-processing" class="wizard-step" style="display: none;">
+            <div class="panel-card center-panel" style="text-align: center; padding: 3rem 2rem;">
+                <div class="spinner-container">
+                    <i class="fa-solid fa-circle-notch fa-spin processing-spinner"></i>
+                </div>
+                <h2 style="margin-top: 1.5rem;">Processing Video...</h2>
+                <p class="subtitle" id="process-file-info">Analyzing frames for speed estimations and license plate attributes.</p>
+                
+                <div class="progress-container-wrapper" style="margin: 2.5rem 0;">
+                    <div class="progress-bar-bg">
+                        <div id="process-progress-bar" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        <span id="process-progress-text">0%</span>
+                        <span id="process-status-text">Perspective transforming and tracking vehicles...</span>
+                    </div>
+                </div>
+
+                <!-- Real-time counter of unique vehicles detected -->
+                <div class="live-counter-card">
+                    <div class="counter-label">Unique Vehicles Detected</div>
+                    <div class="counter-value" id="live-detected-counter">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= STEP 3: POST-ANALYSIS RESULTS ================= -->
+        <div id="step-results" class="wizard-step" style="display: none;">
+            
+            <!-- Top Controls bar -->
+            <div class="results-header-container">
+                <div class="results-title-group">
+                    <h2 id="report-title-text"><i class="fa-solid fa-chart-simple"></i> Analytics Report</h2>
+                    <p id="report-meta-text" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px;">video_name.mp4</p>
+                </div>
+                <div class="action-buttons-group">
+                    <a id="download-video-btn" href="#" class="btn-primary">
+                        <i class="fa-solid fa-download"></i> Processed Video
+                    </a>
+                    <a id="download-report-btn" href="#" class="btn-secondary">
+                        <i class="fa-solid fa-file-csv"></i> CSV Logs
+                    </a>
+                    <a id="download-summary-btn" href="#" class="btn-secondary">
+                        <i class="fa-solid fa-file-lines"></i> Summary Report
+                    </a>
+                    <button class="btn-secondary" onclick="resetToUpload()" style="border-color: rgba(59, 130, 246, 0.4); color: var(--accent-blue);">
+                        <i class="fa-solid fa-rotate-left"></i> Analyze New Video
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dynamic grid layout -->
+            <div class="results-grid">
+                
+                <!-- Left column: Player and Metrics -->
+                <div class="results-left">
+                    
+                    <!-- Processed annotated video player -->
+                    <div class="panel-card player-card">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-video"></i> Annotated Traffic Footage</h2>
+                        </div>
+                        <div class="video-wrapper">
+                            <video id="processed-video-player" class="video-stream" controls src="" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+
+                    <!-- Metric Cards Grid -->
+                    <div class="metrics-grid" style="margin-top: 1.5rem;">
+                        <div class="metric-card total">
+                            <div class="metric-info">
+                                <p>Total Vehicles</p>
+                                <h3 id="report-total-vehicles">0</h3>
+                            </div>
+                            <div class="metric-icon"><i class="fa-solid fa-car"></i></div>
+                        </div>
+                        
+                        <div class="metric-card speed">
+                            <div class="metric-info">
+                                <p>Average Speed</p>
+                                <h3><span id="report-avg-speed">0.0</span> <span class="unit">km/h</span></h3>
+                            </div>
+                            <div class="metric-icon"><i class="fa-solid fa-gauge"></i></div>
+                        </div>
+                        
+                        <div class="metric-card max-speed">
+                            <div class="metric-info">
+                                <p>Maximum Speed</p>
+                                <h3><span id="report-max-speed">0.0</span> <span class="unit">km/h</span></h3>
+                            </div>
+                            <div class="metric-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--accent-purple);"><i class="fa-solid fa-gauge-high"></i></div>
+                        </div>
+                        
+                        <div class="metric-card violations">
+                            <div class="metric-info">
+                                <p>Speed Violations</p>
+                                <h3 id="report-violations" style="color: var(--accent-red);">0</h3>
+                            </div>
+                            <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right column: Vehicle Classification and Pie Chart -->
+                <div class="results-right">
+                    
+                    <div class="panel-card class-card">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-traffic-light"></i> Vehicle Classification</h2>
+                        </div>
+                        <div class="class-list">
+                            <div class="class-item">
+                                <div class="class-info">
+                                    <span class="class-label"><i class="fa-solid fa-car"></i> Cars</span>
+                                    <span class="class-count" id="report-cars">0</span>
+                                </div>
+                                <div class="class-bar-bg">
+                                    <div id="bar-cars" class="class-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="class-item">
+                                <div class="class-info">
+                                    <span class="class-label"><i class="fa-solid fa-motorcycle"></i> Motorcycles</span>
+                                    <span class="class-count" id="report-bikes">0</span>
+                                </div>
+                                <div class="class-bar-bg">
+                                    <div id="bar-bikes" class="class-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="class-item">
+                                <div class="class-info">
+                                    <span class="class-label"><i class="fa-solid fa-bus"></i> Buses</span>
+                                    <span class="class-count" id="report-buses">0</span>
+                                </div>
+                                <div class="class-bar-bg">
+                                    <div id="bar-buses" class="class-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="class-item">
+                                <div class="class-info">
+                                    <span class="class-label"><i class="fa-solid fa-truck"></i> Trucks</span>
+                                    <span class="class-count" id="report-trucks">0</span>
+                                </div>
+                                <div class="class-bar-bg">
+                                    <div id="bar-trucks" class="class-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Distribution Chart -->
+                    <div class="panel-card chart-panel" style="margin-top: 1.5rem;">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-chart-pie"></i> Type Distribution</h2>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="uploadCategoryChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Lower charts and lists container -->
+            <div class="results-charts-container" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <!-- Color Distribution Bar Chart -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-palette"></i> Vehicle Color Distribution</h2>
+                    </div>
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="uploadColorChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Navigation Sidebar for switching sessions -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-folder-open"></i> Upload Session History</h2>
+                    </div>
+                    <div class="history-list" id="results-history-list" style="max-height: 250px; overflow-y: auto;">
+                        <!-- Populate dynamic upload runs -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speed Violations Log Table -->
+            <div class="panel-card violations-panel" style="margin-top: 1.5rem;">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-triangle-exclamation"></i> Speed Violations Log</h2>
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="report-search" placeholder="Search plates, types, colors..." onkeyup="filterTable('report-table-body', 'report-search')">
+                    </div>
+                </div>
+                
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Timestamp</th>
+                                <th>Vehicle ID</th>
+                                <th>Type</th>
+                                <th>Color</th>
+                                <th>Speed</th>
+                                <th>Plate Number</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-secondary);">No violations registered for this video.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Image Detail Zoom Modal -->
+    <div id="image-modal" class="modal" onclick="closeModal()">
+        <span class="modal-close"><i class="fa-solid fa-xmark"></i></span>
+        <img class="modal-content" id="modal-img" alt="Evidence Bounding Box">
+    </div>
+
+    <!-- Page Logic -->
+    <script>
+        let uploadCategoryChart = null;
+        let uploadColorChart = null;
+        let currentPollInterval = null;
+        let selectedFile = null;
+
+        // Colors mapping logic for Vehicle Color Distribution
+        const colorHexMapping = {
+            'White': '#f9fafb',
+            'Black': '#1f2937',
+            'Gray': '#9ca3af',
+            'Red': '#ef4444',
+            'Blue': '#3b82f6',
+            'Green': '#10b981',
+            'Yellow': '#f59e0b',
+            'Silver': '#cbd5e1',
+            'Orange': '#f97316',
+            'Brown': '#78350f'
+        };
+
+        document.addEventListener("DOMContentLoaded", function() {
+            initCharts();
+            fetchHistory();
+        });
+
+        // Initialize empty charts on load
+        function initCharts() {
+            const ctxCategory = document.getElementById('uploadCategoryChart').getContext('2d');
+            uploadCategoryChart = new Chart(ctxCategory, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Car', 'Motorcycle', 'Bus', 'Truck'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#ef4444'],
+                        borderWidth: 1,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#f3f4f6',
+                                font: { family: 'Outfit', size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctxColor = document.getElementById('uploadColorChart').getContext('2d');
+            uploadColorChart = new Chart(ctxColor, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Vehicles Detected',
+                        data: [],
+                        backgroundColor: [],
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 10 }, precision: 0 },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 10 } },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Dropzone drag-over classes
+        const dropZone = document.getElementById('upload-box');
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                dropZone.classList.add('highlight');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                dropZone.classList.remove('highlight');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function triggerFileSelect() {
+            document.getElementById('file-input').click();
+        }
+
+        function handleFileSelected() {
+            const fileInput = document.getElementById('file-input');
+            if (fileInput.files.length > 0) {
+                handleFile(fileInput.files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            // Check file type
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!['mp4', 'avi', 'mov'].includes(ext)) {
+                alert("Unsupported format. Please upload an MP4, AVI, or MOV video.");
+                return;
+            }
+            
+            selectedFile = file;
+            
+            // Populate display
+            document.getElementById('selected-filename').innerText = file.name;
+            document.getElementById('selected-filesize').innerText = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+            
+            document.getElementById('selected-file-info').style.display = 'flex';
+            document.getElementById('upload-box').style.display = 'none';
+            document.getElementById('analyze-btn').style.display = 'block';
+        }
+
+        function removeSelectedFile(event) {
+            event.stopPropagation();
+            selectedFile = null;
+            document.getElementById('file-input').value = "";
+            document.getElementById('selected-file-info').style.display = 'none';
+            document.getElementById('upload-box').style.display = 'flex';
+            document.getElementById('analyze-btn').style.display = 'none';
+        }
+
+        // Upload and Trigger Background processing
+        function startAnalysis() {
+            if (!selectedFile) return;
+
+            const speedLimit = document.getElementById('upload-speed-limit').value;
+            const roadWidth = document.getElementById('upload-road-width').value;
+            const roadLength = document.getElementById('upload-road-length').value;
+            
+            const src_points = [
+                [parseInt(document.getElementById('up-p1-x').value), parseInt(document.getElementById('up-p1-y').value)],
+                [parseInt(document.getElementById('up-p2-x').value), parseInt(document.getElementById('up-p2-y').value)],
+                [parseInt(document.getElementById('up-p3-x').value), parseInt(document.getElementById('up-p3-y').value)],
+                [parseInt(document.getElementById('up-p4-x').value), parseInt(document.getElementById('up-p4-y').value)]
+            ];
+
+            const formData = new FormData();
+            formData.append('video', selectedFile);
+            formData.append('speed_limit', speedLimit);
+            formData.append('road_width', roadWidth);
+            formData.append('road_length', roadLength);
+            formData.append('src_points', JSON.stringify(src_points));
+
+            // Switch to processing wizard state
+            document.getElementById('step-upload').style.display = 'none';
+            document.getElementById('step-processing').style.display = 'block';
+            document.getElementById('process-file-info').innerText = `Uploading and processing "${selectedFile.name}"...`;
+            
+            const progressBar = document.getElementById('process-progress-bar');
+            const progressText = document.getElementById('process-progress-text');
+            const statusText = document.getElementById('process-status-text');
+            
+            progressBar.style.width = "0%";
+            progressText.innerText = "0%";
+            statusText.innerText = "Uploading footage to server...";
+            document.getElementById('live-detected-counter').innerText = "0";
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+            
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    // Map upload state to 0-15% of progress bar
+                    const scaleVal = (percent * 0.15).toFixed(1);
+                    progressBar.style.width = scaleVal + "%";
+                    progressText.innerText = scaleVal + "%";
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res.status === "success") {
+                        statusText.innerText = "YOLOv8 segmenting road coordinates...";
+                        pollProcessingProgress(res.video_id);
+                    } else {
+                        alert("Server failed to initiate worker: " + res.message);
+                        resetToUpload();
+                    }
+                } else {
+                    alert("Upload error. HTTP status: " + xhr.status);
+                    resetToUpload();
+                }
+            };
+
+            xhr.onerror = function() {
+                alert("Network transmission error occurred.");
+                resetToUpload();
+            };
+
+            xhr.send(formData);
+        }
+
+        // Poll video progress and dynamic unique detections count
+        function pollProcessingProgress(videoId) {
+            if (currentPollInterval) clearInterval(currentPollInterval);
+
+            const progressBar = document.getElementById('process-progress-bar');
+            const progressText = document.getElementById('process-progress-text');
+            const statusText = document.getElementById('process-status-text');
+            const liveCounter = document.getElementById('live-detected-counter');
+
+            let dotsIdx = 0;
+
+            currentPollInterval = setInterval(() => {
+                fetch('/api/video_status/' + videoId)
+                    .then(response => response.json())
+                    .then(video => {
+                        // Update unique vehicles count dynamically
+                        liveCounter.innerText = video.vehicles_detected || 0;
+
+                        if (video.status === 'processing' || video.status === 'pending') {
+                            // Map database progress (0-100%) to (15-99%)
+                            const finalProgress = (15 + (video.progress * 0.84)).toFixed(1);
+                            progressBar.style.width = finalProgress + "%";
+                            progressText.innerText = finalProgress + "%";
+                            
+                            dotsIdx = (dotsIdx + 1) % 4;
+                            statusText.innerText = "YOLOv8 tracking vehicles and reading license plates" + ".".repeat(dotsIdx);
+
+                        } else if (video.status === 'completed') {
+                            clearInterval(currentPollInterval);
+                            progressBar.style.width = "100%";
+                            progressText.innerText = "100%";
+                            statusText.innerText = "Compiling CSV and text reports...";
+                            
+                            setTimeout(() => {
+                                loadReport(videoId);
+                                fetchHistory();
+                                // Switch to results view
+                                document.getElementById('step-processing').style.display = 'none';
+                                document.getElementById('step-results').style.display = 'block';
+                            }, 800);
+
+                        } else if (video.status === 'failed') {
+                            clearInterval(currentPollInterval);
+                            alert("Surveillance processing worker failed.");
+                            resetToUpload();
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error polling video status:", err);
+                    });
+            }, 1200);
+        }
+
+        // Load dynamic report data
+        function loadReport(videoId) {
+            fetch('/api/video_report/' + videoId)
+                .then(response => response.json())
+                .then(data => {
+                    const info = data.video_info;
+                    
+                    const name = info.filename.split('_').slice(2).join('_') || info.filename;
+                    document.getElementById('report-meta-text').innerText = `${name} | Uploaded on ${info.upload_time}`;
+                    
+                    // Setup downloads
+                    document.getElementById('download-video-btn').href = `/download/video/${videoId}`;
+                    document.getElementById('download-report-btn').href = `/download/report/${videoId}`;
+                    document.getElementById('download-summary-btn').href = `/download/summary/${videoId}`;
+                    
+                    // Setup Player
+                    const player = document.getElementById('processed-video-player');
+                    player.src = `/stream/video/${videoId}`;
+                    player.load();
+
+                    // Stats cards
+                    document.getElementById('report-total-vehicles').innerText = info.total_vehicles;
+                    document.getElementById('report-avg-speed').innerText = info.avg_speed.toFixed(1);
+                    document.getElementById('report-max-speed').innerText = info.max_speed.toFixed(1);
+                    document.getElementById('report-violations').innerText = info.overspeeding_count;
+
+                    // Table classes counts
+                    document.getElementById('report-cars').innerText = info.cars_count;
+                    document.getElementById('report-bikes').innerText = info.bikes_count;
+                    document.getElementById('report-buses').innerText = info.buses_count;
+                    document.getElementById('report-trucks').innerText = info.trucks_count;
+
+                    // Class bars percentages
+                    const total = info.total_vehicles || 1;
+                    document.getElementById('bar-cars').style.width = ((info.cars_count / total) * 100) + "%";
+                    document.getElementById('bar-bikes').style.width = ((info.bikes_count / total) * 100) + "%";
+                    document.getElementById('bar-buses').style.width = ((info.buses_count / total) * 100) + "%";
+                    document.getElementById('bar-trucks').style.width = ((info.trucks_count / total) * 100) + "%";
+
+                    // Update category pie chart
+                    uploadCategoryChart.data.datasets[0].data = [
+                        info.cars_count || 0,
+                        info.bikes_count || 0,
+                        info.buses_count || 0,
+                        info.trucks_count || 0
+                    ];
+                    uploadCategoryChart.update();
+
+                    // Update color bar chart dynamically
+                    const colorLabels = Object.keys(data.color_counts);
+                    const colorValues = Object.values(data.color_counts);
+                    const backgrounds = colorLabels.map(col => colorHexMapping[col] || '#6b7280');
+                    
+                    uploadColorChart.data.labels = colorLabels;
+                    uploadColorChart.data.datasets[0].data = colorValues;
+                    uploadColorChart.data.datasets[0].backgroundColor = backgrounds;
+                    uploadColorChart.update();
+
+                    // Detections table
+                    updateViolationsTable(data.recent_violations, 'report-table-body');
+                })
+                .catch(err => {
+                    console.error("Error loading report:", err);
+                });
+        }
+
+        // Populate dynamic runs list
+        function fetchHistory() {
+            fetch('/api/history')
+                .then(response => response.json())
+                .then(videos => {
+                    const uploadHistoryList = document.getElementById('upload-history-list');
+                    const resultsHistoryList = document.getElementById('results-history-list');
+                    
+                    if (!videos || videos.length === 0) {
+                        uploadHistoryList.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; grid-column: 1 / -1;">No uploads logged in this session.</div>`;
+                        resultsHistoryList.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0;">No previous runs.</div>`;
+                        return;
+                    }
+
+                    let uploadHtml = '';
+                    let resultsHtml = '';
+
+                    videos.forEach(v => {
+                        const name = v.filename.split('_').slice(2).join('_') || v.filename;
+                        
+                        let badgeClass = 'blue';
+                        let statusStr = v.status;
+                        if (v.status === 'completed') {
+                            badgeClass = 'green';
+                            statusStr = 'Ready';
+                        } else if (v.status === 'processing') {
+                            badgeClass = 'red';
+                            statusStr = 'Processing';
+                        } else if (v.status === 'failed') {
+                            badgeClass = 'red';
+                            statusStr = 'Failed';
+                        }
+
+                        // Upload screen history grid item
+                        uploadHtml += `
+                            <div class="history-grid-item ${v.status === 'completed' ? 'clickable' : ''}" onclick="${v.status === 'completed' ? `showCompletedReport(${v.id})` : ''}">
+                                <div class="run-header">
+                                    <span class="run-name" title="${name}">${name}</span>
+                                    <span class="badge ${badgeClass}">${statusStr}</span>
+                                </div>
+                                <div class="run-details">
+                                    <span>Uploaded: ${v.upload_time}</span>
+                                    ${v.status === 'completed' ? `<span>Detections: ${v.total_vehicles}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+
+                        // Results screen history list item
+                        resultsHtml += `
+                            <div class="history-item clickable" onclick="loadReport(${v.id})">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <strong style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" title="${name}">${name}</strong>
+                                    <span class="badge ${badgeClass}" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">${statusStr}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                                    <span>${v.upload_time}</span>
+                                    <span>${v.total_vehicles} detected</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    uploadHistoryList.innerHTML = uploadHtml;
+                    resultsHistoryList.innerHTML = resultsHtml;
+                });
+        }
+
+        function showCompletedReport(videoId) {
+            loadReport(videoId);
+            document.getElementById('step-upload').style.display = 'none';
+            document.getElementById('step-results').style.display = 'block';
+        }
+
+        // Restore upload dashboard state
+        function resetToUpload() {
+            if (currentPollInterval) clearInterval(currentPollInterval);
+            
+            selectedFile = null;
+            document.getElementById('file-input').value = "";
+            document.getElementById('processed-video-player').src = "";
+            
+            document.getElementById('selected-file-info').style.display = 'none';
+            document.getElementById('upload-box').style.display = 'flex';
+            document.getElementById('analyze-btn').style.display = 'none';
+            
+            document.getElementById('step-processing').style.display = 'none';
+            document.getElementById('step-results').style.display = 'none';
+            document.getElementById('step-upload').style.display = 'block';
+            
+            fetchHistory();
+        }
+
+        // Render Recent Violations in Table
+        function updateViolationsTable(violations, tableBodyId) {
+            const tbody = document.getElementById(tableBodyId);
+            
+            if (!violations || violations.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0;">No speed violations detected.</td></tr>`;
+                return;
+            }
+            
+            let rowsHtml = '';
+            violations.forEach(v => {
+                const imgTag = v.image_path ? 
+                    `<img class="evidence-thumb" src="/static/violations/${v.image_path}" onclick="openModal('/static/violations/${v.image_path}')" alt="Violation">` : 
+                    `<i class="fa-solid fa-image-portrait" style="font-size: 1.5rem; color: rgba(255,255,255,0.1);"></i>`;
+                
+                const plateText = v.plate_number ? v.plate_number : '<span style="color: var(--text-secondary); font-style: italic;">UNDETECTED</span>';
+                
+                rowsHtml += `
+                    <tr>
+                        <td>${imgTag}</td>
+                        <td>${v.timestamp}</td>
+                        <td><strong>#${v.vehicle_id}</strong></td>
+                        <td>${v.type}</td>
+                        <td>${v.color}</td>
+                        <td style="color: var(--accent-red); font-weight: 700;">${v.speed.toFixed(1)} km/h</td>
+                        <td><span class="badge ${v.plate_number ? 'green' : 'red'}" style="font-family: monospace; font-size: 0.9rem; padding: 0.25rem 0.5rem;">${plateText}</span></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rowsHtml;
+        }
+
+        // Filter Table on Search Input
+        function filterTable(tableBodyId, searchInputId) {
+            const input = document.getElementById(searchInputId);
+            const filter = input.value.toUpperCase();
+            const tbody = document.getElementById(tableBodyId);
+            const tr = tbody.getElementsByTagName("tr");
+
+            for (let i = 0; i < tr.length; i++) {
+                let matchFound = false;
+                const tds = tr[i].getElementsByTagName("td");
+                
+                for (let j = 1; j < tds.length; j++) {
+                    const td = tds[j];
+                    if (td) {
+                        const txtValue = td.textContent || td.innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            matchFound = true;
+                            break;
+                        }
+                    }
+                }
+                if (matchFound) {
+                    tr[i].style.display = "";
+                } else {
+                    if (tr[i].cells.length > 1) {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        // Modal triggers
+        function openModal(imgSrc) {
+            const modal = document.getElementById("image-modal");
+            const modalImg = document.getElementById("modal-img");
+            modal.style.display = "flex";
+            modalImg.src = imgSrc;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById("image-modal");
+            modal.style.display = "none";
+        }
+    </script>
+</body>
+</html>
