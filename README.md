@@ -63,42 +63,56 @@ vehicle-monitoring/
     └── traffic_surveillance.db # SQLite database (git-ignored)
 ```
 
----
-
 ## Installation & Setup
 
-### 1. Clone & Navigate
-Ensure you are in the project workspace folder:
-```powershell
-cd "d:\Desktop\Vehicle Monitoring System"
+### Step 1: Clone the Repository
+
+```bash
+git clone <repository-url>
+cd vehicle-monitoring
 ```
 
-### 2. Set Up Virtual Environment (Recommended)
-```powershell
+### Step 2: Create a Virtual Environment
+
+```bash
 python -m venv venv
-# Activate on Windows:
-venv\Scripts\Activate.ps1
-# Activate on Linux/macOS:
+```
+
+### Step 3: Activate the Virtual Environment
+
+**Windows**
+
+```bash
+venv\Scripts\activate
+```
+
+**Linux / macOS**
+
+```bash
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
-```powershell
+### Step 4: Install Required Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
----
+### Step 5: Launch the Application
 
-##  Running the Platform
+```bash
+python app.py
+```
 
-1. Start the Flask application:
-   ```powershell
-   python app.py
-   ```
-2. Open your browser and navigate to:
-    **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
+### Step 6: Access the Web Interface
 
----
+Open your browser and visit:
+
+```text
+http://127.0.0.1:5000
+```
+
+The application will start with an upload page where you can submit a traffic video for AI-powered vehicle detection, speed estimation, color recognition, and analytics generation.
 
 ##  Database Schema
 
